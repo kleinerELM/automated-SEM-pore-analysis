@@ -1,9 +1,9 @@
 // Macro for ImageJ 1.52d for Windows
 // written by Florian Kleiner 2019
-// run from commandline as follows
+// run from command line as follows
 // ImageJ-win64.exe -macro "C:\path\to\REMPorenanalyse.ijm" "D:\path\to\data\|thresholdLimit|infoBarheight|metricScale|pixelScale|doSpeckleCleaning"
 
-macro "REMPorenanalyse" {
+macro "REMPorenanalyseFolder" {
 	// check if an external argument is given or define the options
 	arg = getArgument();
 	doSpeckleCleaning = true;
@@ -11,29 +11,32 @@ macro "REMPorenanalyse" {
 		dir = getDirectory("Choose a Directory");	
 		//define number of slices for uniformity analysis
 		thresholdLimit	= 140; // max threshold value to detect Pores
-		infoBarHeight	= 63; // height of the infobar at the bottom of SEM images
-		metricScale		= 0; // size fo the scale bar in nm
-		pixelScale		= 0; // size fo the scale bar in px
+		infoBarHeight	= 63; // height of the info bar at the bottom of SEM images
+		metricScale		= 0; // size for the scale bar in nm
+		pixelScale		= 0; // size for the scale bar in px
 	} else {
+		print("arguments found");
 		arg_split = split(getArgument(),"|");
 		dir				= arg_split[0];
 		thresholdLimit	= parseInt(arg_split[1]);
 		infoBarHeight	= parseInt(arg_split[2]);
-		metricScale		= parseInt(arg_split[3]);
+		metricScale		= parseFloat(arg_split[3]);
 		pixelScale		= parseInt(arg_split[4]);
 		if ( parseInt(arg_split[5]) == 0 ) {
 			doSpeckleCleaning = false;
 		}
 	}
 	print("Starting process using the following arguments...");
-	print("Directory: " + dir);
-	print("Pore brightness limit: " + thresholdLimit);
+	print("  Directory: " + dir);
+	print("  Pore brightness limit: " + thresholdLimit);
+	print("  argument based image-scale: " + pixelScale + " px / " + metricScale + " nm");
 	if ( metricScale == 0 || pixelScale == 0 ) {
 		do_scaling = false;
-		print("No image-scale assumed! Calculation only pixel values!");
+		print("  No image-scaling set! Calculation only pixel values!");
 	} else {
 		do_scaling = true;
-		print("Assumed image-scale: " + pixelScale + " px / " + metricScale + " nm");
+		scaleX = metricScale/pixelScale;
+		print( "  Set scale 1 px = " + scaleX + " nm" );
 	}
 	print("Info bar height: " + infoBarHeight + " px");
 	print("------------");
@@ -72,6 +75,9 @@ macro "REMPorenanalyse" {
 				//////////////////////
 				width			= getWidth();
 				height			= getHeight();
+				if ( do_scaling ) {
+					run("Set Scale...", "distance=" + pixelScale + " known=" + metricScale + " pixel=1 unit=nm");
+				}
 				
 				//////////////////////
 				// processing
@@ -107,7 +113,6 @@ macro "REMPorenanalyse" {
 				Table.deleteRows(0, 1);
 				// get scaled values of the particle analysis
 				if ( do_scaling ) {
-					run("Set Scale...", "distance=" + pixelScale + " known=" + metricScale + " pixel=1 unit=nm"); //set scale
 					run("Analyze Particles...", "  show=Overlay display clear");
 					selectWindow("Results");
 					// saving masked pores file

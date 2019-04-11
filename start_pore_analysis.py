@@ -123,8 +123,17 @@ def processArguments():
         outputType = 2
     print( '' )
 
-def analyseImages( directory ):
-    command = "ImageJ-win64.exe -macro \"" + home_dir +"\pore_analysis.ijm\" \"" + directory + "/|" + str(thresholdLimit) + "|" + str(infoBarHeight) + "|" + str(metricScale) + "|" + str(pixelScale) + "|" + str(doSpeckleCleaning) + "\""
+def analyseImages( directory, file ):
+    global metricScale
+    global pixelScale
+    global doSpeckleCleaning
+    global infoBarHeight
+    global thresholdLimit
+    options = "/|" + str(thresholdLimit) + "|" + str(infoBarHeight) + "|" + str(metricScale) + "|" + str(pixelScale) + "|" + str(doSpeckleCleaning) + "\""
+    if ( file == "" ) :
+        command = "ImageJ-win64.exe -macro \"" + home_dir +"\pore_analysis.ijm\" \"" + directory + options
+    else:
+        command = "ImageJ-win64.exe -macro \"" + home_dir +"\pore_analysis_single_file.ijm\" \"" + directory + "\\" + file + options
     print( "starting ImageJ Macro..." )
     if ( showDebuggingOutput ) : print( command )
     try:
@@ -134,6 +143,9 @@ def analyseImages( directory ):
         pass
 
 def getPixelSizeFromMetaData( directory, filename ):
+    global pixelSize
+    global metricScale
+    global pixelScale
     pixelSize = 0
     with open(directory + '/' + filename, 'rb', 0) as file, \
         mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ) as s:
@@ -141,6 +153,8 @@ def getPixelSizeFromMetaData( directory, filename ):
             file.seek(s.find(b'PixelWidth'))
             tempLine = str( file.readline() ).split("=",1)[1]
             pixelSize = float( tempLine.split("\\",1)[0] )*1000000000
+            pixelScale = 1
+            metricScale = pixelSize
             print( " detected image scale: " + str( pixelSize ) + " nm / px" )
     return pixelSize
 
@@ -389,7 +403,12 @@ def createGnuplotPlot( directory, filename ):
         gp_file.write( gnuplotBefehl + "\n" )
         gp_file.close()
         os.system('gnuplot "' + directory + '/' + filename + '.gp"')
-        subprocess.Popen( directory + '/' + filename + '.pdf' ,shell=True)
+        pdfPath = directory + '/' + filename + '.pdf'
+        if ( os.path.exists( pdfPath ) ) :
+            print( "opening '" + pdfPath + "'" )
+            subprocess.Popen( pdfPath ,shell=True)
+        else:
+            print( "Error creating '" + pdfPath + "'!" )
     gnuplotBefehl = 'plot '
     gnuplotPlotID = 1
     print( "done" )
@@ -413,11 +432,18 @@ if ( showDebuggingOutput ) : print( "Selected working directory: " + workingDire
 #main process
 if scaleInMetaData( workingDirectory ) :
     # use metaData in files to determine scale
-    print( "Tif with scale metadata found!" )
+    print( "Tiffs with scale metadata found!" )
     if ( runImageJ_Script ):
-        analyseImages( workingDirectory )
+        if os.path.isdir( workingDirectory ) :
+            for file in os.listdir(workingDirectory):
+                if ( file.endswith(".tif") or file.endswith(".TIF")):
+                    filename = os.fsdecode(file)
+                    print( " Analysing " + filename + ";" )
+                    getPixelSizeFromMetaData( workingDirectory, filename )
+                    analyseImages( workingDirectory, filename )
     processImageJResults( workingDirectory )
-    createGnuplotPlot( workingDirectory, 'Plot' )
+    if ( runGnuPlot_Script ):
+        createGnuplotPlot( workingDirectory, 'Plot' )
 else:
     # search for formatted folders (eg: 400nm) to determine scale
     for subDir in os.listdir(workingDirectory):
@@ -427,7 +453,7 @@ else:
             folderScale = metricScale/pixelScale #nm/px
             print( "Selected scale:  " + str( metricScale ) + " nm / " + str( pixelScale ) + " px = " + str( folderScale ) + " nm / px" )
             if ( runImageJ_Script ):
-                analyseImages( directory )
+                analyseImages( directory, "" )
             processImageJResults( directory, folderScale )
             if ( runGnuPlot_Script ):
                 createGnuplotPlot( directory, subDir )
