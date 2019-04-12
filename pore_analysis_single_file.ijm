@@ -28,6 +28,7 @@ macro "REMPorenanalyse" {
 	}
 	dir = File.getParent(filePath);
 	print("Starting process using the following arguments...");
+	print("  File: " + filePath);
 	print("  Directory: " + dir);
 	print("  Pore brightness limit: " + thresholdLimit);
 	print("  argument based image-scale: " + pixelScale + " px / " + metricScale + " nm");
@@ -52,7 +53,7 @@ macro "REMPorenanalyse" {
 	//list = getFileList(dir);
 	
 	// running main loop
-	setBatchMode(true);
+	//setBatchMode(true);
 	
 	if (!endsWith(filePath,"/") && ( endsWith(filePath,".tif") || endsWith(filePath,".jpg") || endsWith(filePath,".JPG") ) ) {
 		open(filePath);
@@ -111,11 +112,17 @@ macro "REMPorenanalyse" {
 			Table.deleteRows(0, 1);
 			// get scaled values of the particle analysis
 			if ( do_scaling ) {
+				print( "  analysing pores ..." );
 				run("Analyze Particles...", "  show=Overlay display clear");
 				selectWindow("Results");
 				// saving masked pores file
 				saveAs("Text", outputDir_Pores + baseName + "_pores_sqnm.csv");
-				Table.deleteRows(0, 1);
+				run("Clear Results");
+				//selectWindow("C3S 28d cryoBIB_004-masked.tif");
+				run("Line Length Counter");
+				selectWindow("Results");
+				saveAs("Text", outputDir_Pores + baseName + "_pores_hor_lines.csv");
+				//Table.deleteRows(0, 1);
 			}
 
 			//////////////////////
