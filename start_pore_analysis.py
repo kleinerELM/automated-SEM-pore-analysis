@@ -51,6 +51,7 @@ thresholdLimit = 140
 infoBarHeight = 63
 metricScale = 0
 pixelScale  = 0
+pixelSize = 0
 poreSizeRangeArray = [ 0, 1, 2, 4, 8, 16, 31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000, 31500, 63000, 125000, 250000, 500000, 1000000, 2000000 ] # in nm or nm², depending on parameter -p!
 # prepare result arrays
 poreCountSumArray = []
@@ -62,7 +63,7 @@ poreSizeSumPercentArray = []
 #areaSum = 0
 resulCSVTable = []
 gnuplotBefehl = 'plot '
-gnuplotPlotLineID = 'plot '
+gnuplotLineBefehl = 'plot '
 gnuplotPlotID = 1
 gnuplotPlotLineID = 1
 
@@ -80,7 +81,7 @@ def processArguments():
             print( '-i, --noImageJ       : skip ImageJ processing' )
             print( '-g, --noGnuPlot      : skip GnuPlot processing' )
             print( '-s, --printSumPlot   : printing sums in GnuPlot' )
-            print( '-o, --setOutputType  : set output type (0: area%, 1: nm², 2: particle count)' )
+            print( '-o, --setOutputType  : set output type (0: area%, 1: nm², 2: particle count, 3: line length)' )
             print( '                       Not changeable while using -p! Will be set to 2 automatically.' )
             print( '-c                   : do not clean the image using erode/dilate' )
             print( '-p, --calcPoreDia    : calculate using mean pore diameter instead of pore area' )
@@ -292,7 +293,6 @@ def processLineData( directory, filename, pixelSize ):
     # pore analysis
     resultLine = ""
     global resulCSVTable
-    global outputType
     with open(directory + outputDir_Pores + filename + suffix_Pores, 'r') as csv_file:
         im = Image.open( directory + outputDir_Pores + filename + "-masked.tif")
         width, height = im.size
@@ -310,26 +310,25 @@ def processLineData( directory, filename, pixelSize ):
         for line in csv_reader:
             if ( CSVLineNr > 0 and line != "" ): # ignore first line (headline) and empty lines
                 
-                lineLength = float( line[1] ) # get area in nm
+                lineLength = float( line[1] ) # get line length in nm
                 
                 #search the correct size range and insert into corresponding result array
                 for i in range(len(poreSizeRangeArray)):
                     if ( i > 0 ):
                         if ( showDebuggingOutput ) : print(str(i) + '|' + str( poreSizeRangeArray[i-1]) + '|' + str(poreSizeRangeArray[i]))
-                        if (len(poreSizeRangeArray)-1 == i and poreSizeRangeArray[i] < poreSize ):
+                        if (len(poreSizeRangeArray)-1 == i and poreSizeRangeArray[i] < lineLength ):
                             if ( showDebuggingOutput ) : print( 'A: ' + str(poreSizeRangeArray[i]) + '<' + str(lineLength))
                             lineSizeArray[i]  += lineLength
                             lineCountArray[i] += 1
-                            lineCountSumArray[i] += 1
-                        elif ( poreSizeRangeArray[i-1] < poreSize and poreSizeRangeArray[i] > poreSize ):
-                            if ( showDebuggingOutput ) : print( 'B: ' + str(poreSizeRangeArray[i-1]) + '<' + str(poreSize) + '<' + str( poreSizeRangeArray[i]) )
+                            #lineCountSumArray[i] += 1
+                        elif ( poreSizeRangeArray[i-1] < lineLength and poreSizeRangeArray[i] > lineLength ):
+                            if ( showDebuggingOutput ) : print( 'B: ' + str(poreSizeRangeArray[i-1]) + '<' + str(lineLength) + '<' + str( poreSizeRangeArray[i]) )
                             lineSizeArray[i]  += lineLength
                             lineCountArray[i] += 1
-                            lineCountSumArray[i] += 1
+                            #lineCountSumArray[i] += 1
             CSVLineNr += 1
         print ( " processed elements: " + str( CSVLineNr ) )
         # process result line
-        fullAreaPoresSum = 0
         resulCSVTable[0] += "," + filename
         resulCSVTable[1] += "," + str( round( pixelSize, 3 ) )
         offset = 2 # depends on previous/comment lines in the resultCSVTable
@@ -340,18 +339,11 @@ def processLineData( directory, filename, pixelSize ):
 
             resulCSVTable[i+offset] += "," + str( round( lineSizeArray[i], 2 ) )
             resultLine += "," + str( round( lineSizeArray[i], 2 ) )
-
-            # calculating summed up area for terminal output
-            if calculatePoreDiameter:
-                fullAreaPoresSum += poreSizeArray[i] * poreSizeArray[i]
-            else:
-                fullAreaPoresSum += poreSizeArray[i]
-        print( " summed up pore area: " + str( round( fullAreaPoresSum/imageArea*100, 2 ) ) + ' Area-%, ' + str( round( fullAreaPoresSum, 2) ) + ' nm²' )
         
-        global gnuplotPlotLineID
-        global gnuplotLineBefehl
-        gnuplotPlotLineID += 1
-        gnuplotLineBefehl += "'mr_result.csv' using 1:" + str( gnuplotPlotID ) + " title '" + filename.replace('_', '\_') + "' with linespoints, "
+        global gnuplotPlotID
+        global gnuplotBefehl
+        gnuplotPlotID += 1
+        gnuplotBefehl += "'mr_line_result.csv' using 1:" + str( gnuplotPlotID ) + " title '" + filename.replace('_', '\_') + "' with linespoints, "
     return resultLine
 
 def processImageJResults( directory, forcedScale = None ):
@@ -394,36 +386,43 @@ def processImageJResults( directory, forcedScale = None ):
                         pixelSize = forcedScale
                         if forcedScale == 1:
                             print( "Skalierung vermutlich fehlerhaft!" )
-                    resultLine = processData( directory, csv_filename, pixelSize )
+                    if ( outputType < 3 ):
+                        resultLine = processData( directory, csv_filename, pixelSize )
+                    elif ( outputType == 3 ):
+                        resultLine = processLineData( directory, csv_filename, pixelSize )
                     csv_file.write( filename + resultLine + "\n" )
                 else:
                     print(csv_filename + suffix_Pores + " not found!")
             elif ( showDebuggingOutput ) : 
                 print( "------" )
                 print(filename + " is no Jpg / Tiff! Skipping!")
-        resultLine = ''
-        print( "------" )
-        print( "Sum for folder " + directory )#+ " (" + str( round( pixelSize, 2 ) ) + " nm / px)" )
-        #resulCSVTable[0] += ",bucketSum"
-        resulCSVTable[0] += ",fullSum"
-        #resulCSVTable[1] += ",-"
-        resulCSVTable[1] += ",-"
-        sumPercent = 0
-        for i in range(len(poreSizeRangeArray)):
-            sumAreaPercent = poreSizeSumPercentArray[i]/analysedImages
-            sumPercent += sumAreaPercent
-            print( '  - ' + str( poreSizeRangeArray[i] ) + ' nm: ' + str( poreCountSumArray[i] ) + 'x (' + str( round( sumAreaPercent, 5) ) + ' Area-%)')
-            if ( calculatePoreDiameter ):
-                resultLine += "," + str( poreCountSumArray[i] )
-                resulCSVTable[i+2] += "," + str( poreCountSumArray[i] )
-            else:
-                resultLine += "," + str( poreCountSumArray[i] ) + "," + str( round( sumAreaPercent, 5) )
-                resulCSVTable[i+2] += "," + str( round( sumAreaPercent, 5) )
-                resulCSVTable[i+2] += "," + str( round( sumPercent, 5) )
-        csv_file.write( 'Summe' + resultLine + "\n" )
+        if ( outputType < 3 ):
+            print( "Sum for folder " + directory )#+ " (" + str( round( pixelSize, 2 ) ) + " nm / px)" )
+            #resulCSVTable[0] += ",bucketSum"
+            resulCSVTable[0] += ",fullSum"
+            #resulCSVTable[1] += ",-"
+            resulCSVTable[1] += ",-"
+            sumPercent = 0
+            for i in range(len(poreSizeRangeArray)):
+                sumAreaPercent = poreSizeSumPercentArray[i]/analysedImages
+                sumPercent += sumAreaPercent
+                print( '  - ' + str( poreSizeRangeArray[i] ) + ' nm: ' + str( poreCountSumArray[i] ) + 'x (' + str( round( sumAreaPercent, 5) ) + ' Area-%)')
+                if ( calculatePoreDiameter ):
+                    resultLine += "," + str( poreCountSumArray[i] )
+                    resulCSVTable[i+2] += "," + str( poreCountSumArray[i] )
+                else:
+                    resultLine += "," + str( poreCountSumArray[i] ) + "," + str( round( sumAreaPercent, 5) )
+                    resulCSVTable[i+2] += "," + str( round( sumAreaPercent, 5) )
+                    resulCSVTable[i+2] += "," + str( round( sumPercent, 5) )
+            csv_file.write( 'Summe' + resultLine + "\n" )
+        else:
+            print( 'Line processing done?!' )
         csv_file.close()
-        
-        csv_file = open(directory + '/mr_result.csv', 'w')
+
+        if ( outputType < 3 ):
+            csv_file = open(directory + '/mr_result.csv', 'w')
+        elif ( outputType == 3 ):
+            csv_file = open(directory + '/mr_line_result.csv', 'w')
         for i in range(len(resulCSVTable)):
             csv_file.write( resulCSVTable[i] + "\n" )
         csv_file.close()
@@ -434,7 +433,8 @@ def processImageJResults( directory, forcedScale = None ):
             #gnuplotPlotID += 1
             #gnuplotBefehl += "'mr_result.csv' using 1:" + str( gnuplotPlotID ) + " title 'bucketSum' with linespoints, "
             gnuplotPlotID += 1
-            gnuplotBefehl += "'mr_result.csv' using 1:" + str( gnuplotPlotID ) + " title 'fullSum' with linespoints linewidth 3"
+            if ( outputType < 3 ):
+                gnuplotBefehl += "'mr_result.csv' using 1:" + str( gnuplotPlotID ) + " title 'fullSum' with linespoints linewidth 3"
             
     else:
         print("Folder '" + outputDir_Pores + "' does not exist! Run ImageJ Macro first!")
@@ -493,6 +493,8 @@ elif ( outputType == 1 ):
     print( 'Output type is set to px²' )
 elif ( outputType == 2 ):
     print( 'Output type is set to particle count' )
+elif ( outputType == 3 ):
+    print( 'Output type is set to line count' )
 else:
     print( 'Output type is undefined! Resetting to area-%' )
     outputType = 0
