@@ -46,6 +46,7 @@ printGnuPlotSums = False #False
 showDebuggingOutput = False
 calculatePoreDiameter = False
 doSpeckleCleaning = 1
+doRemoveBorderPercent = 0
 outputType = 0 # standard output type (y-axis value) is area-%
 thresholdLimit = 140
 infoBarHeight = 63
@@ -69,9 +70,9 @@ gnuplotPlotLineID = 1
 
 def processArguments():
     argv = sys.argv[1:]
-    usage = sys.argv[0] + " [-h] [-i] [-g] [-s] [-c] [-p] [-o <outputType>] [-t <thresholdLimit>] [-d]"
+    usage = sys.argv[0] + " [-h] [-i] [-g] [-s] [-c] [-p] [-o <outputType>] [-t <thresholdLimit>] [-b <removeBorderInPercent>] [-d]"
     try:
-        opts, args = getopt.getopt(argv,"higscpo:t:d",["noImageJ=","noGnuPlot=","printSumPlot=","calcPoreDia="])
+        opts, args = getopt.getopt(argv,"higscpo:t:b:d",["noImageJ=","noGnuPlot=","printSumPlot=","calcPoreDia="])
     except getopt.GetoptError:
         print( usage )
     for opt, arg in opts:
@@ -87,6 +88,7 @@ def processArguments():
             print( '-p, --calcPoreDia    : calculate using mean pore diameter instead of pore area' )
             print( '                       Resets parameter -o to 2 (particle count).' )
             print( '-t                   : set threshold limit (0-255)' )
+            print( '-b                   : set threshold limit (0-45)' )
             print( '-d                   : show debug output' )
             print( '' )
             sys.exit()
@@ -118,6 +120,13 @@ def processArguments():
                 global thresholdLimit
                 thresholdLimit = int( arg )
                 print( 'set threshold limit to ' + str( thresholdLimit ) )
+        elif opt in ("-b"):
+            if ( int( arg ) < 45 and int( arg ) > -1 ):
+                global doRemoveBorderPercent
+                doRemoveBorderPercent = int( arg )
+                print( 'removing ' + str( doRemoveBorderPercent ) + ' % of the image border' )
+
+                
         elif opt in ("-d"):
             print( 'show debugging output' )
             global showDebuggingOutput
@@ -133,11 +142,12 @@ def analyseImages( directory, file ):
     global doSpeckleCleaning
     global infoBarHeight
     global thresholdLimit
-    options = "|" + str(thresholdLimit) + "|" + str(infoBarHeight) + "|" + str(metricScale) + "|" + str(pixelScale) + "|" + str(doSpeckleCleaning) + "\""
+    global doRemoveBorderPercent
+    options = "|" + str(thresholdLimit) + "|" + str(infoBarHeight) + "|" + str(metricScale) + "|" + str(pixelScale) + "|" + str(doSpeckleCleaning)
     if ( file == "" ) :
-        command = "ImageJ-win64.exe -macro \"" + home_dir +"\pore_analysis.ijm\" \"" + directory + "/" + options
+        command = "ImageJ-win64.exe -macro \"" + home_dir +"\pore_analysis.ijm\" \"" + directory + "/" + options + "\""
     else:
-        command = "ImageJ-win64.exe -macro \"" + home_dir +"\pore_analysis_single_file.ijm\" \"" + directory + "/" + file + options
+        command = "ImageJ-win64.exe -macro \"" + home_dir +"\pore_analysis_single_file.ijm\" \"" + directory + "/" + file + options + "|" + str(doRemoveBorderPercent) + "\""
     print( "starting ImageJ Macro..." )
     if ( showDebuggingOutput ) : print( command )
     try:
@@ -458,7 +468,7 @@ def createGnuplotPlot( directory, filename ):
             gp_file.write( 'set xlabel "Porengröße in nm²"' + "\n" )
         
         if ( outputType == 0 ):
-            gp_file.write( 'set ylabel "Gesamtfläche in % der Gesamtbildfläche"' + "\n" )
+            gp_file.write( 'set ylabel "Fläche in % der Gesamtbildfläche"' + "\n" )
             gp_file.write( 'set key left top' + "\n" )
         elif ( outputType == 1 ):
             gp_file.write( 'set ylabel "Gesamtfläche in nm²"' + "\n" )

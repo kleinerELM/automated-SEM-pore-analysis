@@ -14,6 +14,7 @@ macro "REMPorenanalyse" {
 		infoBarHeight	= 63; // height of the info bar at the bottom of SEM images
 		metricScale		= 0; // size for the scale bar in nm
 		pixelScale		= 0; // size for the scale bar in px
+		doRemoveBorderPercent = 0;
 	} else {
 		print("arguments found");
 		arg_split = split(getArgument(),"|");
@@ -25,6 +26,7 @@ macro "REMPorenanalyse" {
 		if ( parseInt(arg_split[5]) == 0 ) {
 			doSpeckleCleaning = false;
 		}
+		doRemoveBorderPercent	= parseInt(arg_split[6]);
 	}
 	dir = File.getParent(filePath);
 	print("Starting process using the following arguments...");
@@ -77,17 +79,27 @@ macro "REMPorenanalyse" {
 			if ( do_scaling ) {
 				run("Set Scale...", "distance=" + pixelScale + " known=" + metricScale + " pixel=1 unit=nm"); //set 
 			}
-			
+
 			//////////////////////
 			// processing
 			//////////////////////
-			makeRectangle(0, 0, width, height-infoBarHeight); // remove info bar
+			if ( doRemoveBorderPercent > 0 ) {
+				removeBorderWidth = floor(width/100*doRemoveBorderPercent);
+				removeBorderHeight = floor((height-infoBarHeight)/100*doRemoveBorderPercent);
+			} else {
+				removeBorderWidth = 0;
+				removeBorderHeight = 0;
+			}
+			//makeRectangle(	removeBorderWidth, removeBorderHeight,
+			//				(width-2*removeBorderWidth), (height-infoBarHeight-2*removeBorderHeight)); // remove info bar
+			makeRectangle(	0,removeBorderHeight,
+							(width-removeBorderWidth), (height-infoBarHeight-removeBorderHeight)); // remove info bar
 			run("Crop");
 			run("8-bit"); // convert to 8-bit-grayscale
 			saveAs("Tiff", outputDir_Cut + cutName );
 			// image enhancements
 			run("Subtract Background...", "rolling=100 light sliding"); // removing shadowing using a rather large ball
-			run("Smooth"); // remove some noise
+			run("Gaussian Blur...", "sigma=2.5");//run("Smooth"); // remove some noise
 			run("Enhance Contrast...", "saturated=0.3 normalize");
 			run("Subtract Background...", "rolling=30 light sliding"); // removing some left over artifacts
 			print( "  saving pores TIF..." );
@@ -99,7 +111,10 @@ macro "REMPorenanalyse" {
 			if ( doSpeckleCleaning ) {
 				run("Erode");
 				run("Dilate");
-				makeRectangle(1, 1, width-2, height-infoBarHeight-2); // remove info bar
+				//makeRectangle(	1, 1, 
+				//				width-2*removeBorderWidth-2, height-infoBarHeight-2*removeBorderHeight-2); // remove info bar
+				makeRectangle(	1, 1, 
+								width-removeBorderWidth-2, height-infoBarHeight-removeBorderHeight-2); // remove info bar
 			}
 			// saving processed file
 			saveAs("Tiff", outputDir_Pores + poresName );
@@ -117,11 +132,11 @@ macro "REMPorenanalyse" {
 				selectWindow("Results");
 				// saving masked pores file
 				saveAs("Text", outputDir_Pores + baseName + "_pores_sqnm.csv");
-				run("Clear Results");
+								run("Clear Results");
 				//selectWindow("C3S 28d cryoBIB_004-masked.tif");
-				run("Line Length Counter");
-				selectWindow("Results");
-				saveAs("Text", outputDir_Pores + baseName + "_pores_hor_lines.csv");
+				//run("Line Length Counter");
+				//selectWindow("Results");
+				//saveAs("Text", outputDir_Pores + baseName + "_pores_hor_lines.csv");
 				//Table.deleteRows(0, 1);
 			}
 
