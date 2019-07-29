@@ -53,12 +53,14 @@ macro "REMPorenanalyseFolder" {
 	// running main loop
 	setBatchMode(true);
 	for (i=0; i<list.length; i++) {
-		path = dir+list[i];		// get all files
+		path = dir+list[i];
+		// get all files
 		showProgress(i, list.length);
 		// select only images
 		if (!endsWith(path,"/") && ( endsWith(path,".tif") || endsWith(path,".jpg") || endsWith(path,".JPG") ) ) {
 			open(path);
-			imageId = getImageID();			// get image id to be able to close the main image
+			imageId = getImageID();
+			// get image id to be able to close the main image
 			if (nImages>=1) {
 				//////////////////////
 				// name definitions
@@ -87,10 +89,10 @@ macro "REMPorenanalyseFolder" {
 				run("8-bit"); // convert to 8-bit-grayscale
 				saveAs("Tiff", outputDir_Cut + cutName );
 				// image enhancements
-				run("Subtract Background...", "rolling=100 light sliding"); // removing shadowing using a rather large ball
-				run("Smooth"); // remove some noise
+				run("Subtract Background...", "rolling=" + round(width / 10) + " light sliding"); // removing shadowing using a rather large ball
+				//run("Smooth"); // remove some noise
 				run("Enhance Contrast...", "saturated=0.3 normalize");
-				run("Subtract Background...", "rolling=30 light sliding"); // removing some left over artifacts
+				run("Subtract Background...", "rolling=" + round(width / 30) + " light sliding"); // removing some left over artifacts
 				print( "  saving pores TIF..." );
 				saveAs("Tiff", outputDir_Processed + processedName );
 				// get pores

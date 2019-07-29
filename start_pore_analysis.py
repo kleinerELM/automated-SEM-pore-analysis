@@ -69,6 +69,8 @@ gnuplotPlotID = 1
 gnuplotPlotLineID = 1
 
 def processArguments():
+    global thresholdLimit
+    global doRemoveBorderPercent
     argv = sys.argv[1:]
     usage = sys.argv[0] + " [-h] [-i] [-g] [-s] [-c] [-p] [-o <outputType>] [-t <thresholdLimit>] [-b <removeBorderInPercent>] [-d]"
     try:
@@ -82,13 +84,13 @@ def processArguments():
             print( '-i, --noImageJ       : skip ImageJ processing' )
             print( '-g, --noGnuPlot      : skip GnuPlot processing' )
             print( '-s, --printSumPlot   : printing sums in GnuPlot' )
-            print( '-o, --setOutputType  : set output type (0: area%, 1: nm², 2: particle count, 3: line length)' )
+            print( '-o, --setOutputType  : set output type (0: area [%], 1: area [nm²], 2: particle count [-], 3: line length [nm])' )
             print( '                       Not changeable while using -p! Will be set to 2 automatically.' )
             print( '-c                   : do not clean the image using erode/dilate' )
             print( '-p, --calcPoreDia    : calculate using mean pore diameter instead of pore area' )
             print( '                       Resets parameter -o to 2 (particle count).' )
-            print( '-t                   : set threshold limit (0-255)' )
-            print( '-b                   : set threshold limit (0-45)' )
+            print( '-t                   : set threshold limit [' + str( thresholdLimit ) +  '] (0-255) ' )
+            print( '-b                   : remove Border in % [' + str( doRemoveBorderPercent ) +  ' %] (0-45)' )
             print( '-d                   : show debug output' )
             print( '' )
             sys.exit()
@@ -117,12 +119,10 @@ def processArguments():
             calculatePoreDiameter = True
         elif opt in ("-t"):
             if ( int( arg ) < 256 and int( arg ) > -1 ):
-                global thresholdLimit
                 thresholdLimit = int( arg )
                 print( 'set threshold limit to ' + str( thresholdLimit ) )
         elif opt in ("-b"):
             if ( int( arg ) < 45 and int( arg ) > -1 ):
-                global doRemoveBorderPercent
                 doRemoveBorderPercent = int( arg )
                 print( 'removing ' + str( doRemoveBorderPercent ) + ' % of the image border' )
 
@@ -458,7 +458,7 @@ def createGnuplotPlot( directory, filename ):
         gp_file = open( directory + '/' + filename + '.gp', 'w')
         gp_file.write( 'set logscale x' + "\n" )
         gp_file.write( 'set datafile separator ","' + "\n" )
-        gp_file.write( 'set terminal pdf size 17cm,10cm' + "\n" )
+        gp_file.write( 'set terminal pdf size 29.7cm,21cm' + "\n" )
         gp_file.write( 'set output "' + directory + '/' + filename + '.pdf"' + "\n" )
         gp_file.write( 'cd "' + directory + '"' + "\n" )
         
@@ -509,7 +509,7 @@ else:
     print( 'Output type is undefined! Resetting to area-%' )
     outputType = 0
 
-workingDirectory = filedialog.askdirectory(title='Please select the image / working directory')
+workingDirectory = filedialog.askdirectory(title='Please select the working directory')
 if ( showDebuggingOutput ) : print( "Selected working directory: " + workingDirectory )
 
 #main process
